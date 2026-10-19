@@ -6,6 +6,7 @@
      0. dnp_spBriefCambiarEstatus  (sin cambios de lógica; incluido para desplegar en otra base)
      1. dnp_spBriefBloquear        (bloqueo del proyecto; ya creado, se deja idempotente)
      2. dnp_spGuardaVersion        (candado en BD, versión inicial pendiente, pausa obligatoria)
+     2a. dnp_fnBriefFaltantesPrimeraVersion (secciones que faltan para cerrar la versión 00)
      2b. dnp_spBriefPausarVersionPendiente (pausa la versión 00 al guardar Legales)
      3. dnp_spBriefLiberarPausa    (error explícito si la pausa no está configurada)
      4. dnp_spObtenerAprobacion    (no ocultar versiones de usuarios fuera de dnp_Llenado)
@@ -201,10 +202,61 @@ END
 GO
 
 /* -------------------------------------------------------------------------------------
+   2a. dnp_fnBriefFaltantesPrimeraVersion
+   Mientras la primera versión está abierta (versión PENDIENTE y proyecto sin pausa),
+   devuelve las secciones que faltan por capturar, separadas por coma. Devuelve ''
+   si no falta nada o si el proyecto no está en esa etapa (versiones posteriores).
+   Se revisa un dato obligatorio de cada sección, así funciona aunque la fila exista
+   vacía. Los proyectos SACHET no llevan Tapa.
+   ------------------------------------------------------------------------------------- */
+CREATE OR ALTER FUNCTION [dbo].[dnp_fnBriefFaltantesPrimeraVersion]
+(
+    @Proyecto VARCHAR(20)
+)
+RETURNS VARCHAR(200)
+AS
+BEGIN
+    DECLARE @f VARCHAR(200) = '', @forma VARCHAR(50);
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.dnp_Brief_Version
+                   WHERE NO_PROYECTO = @Proyecto AND Estatus = 'PENDIENTE')
+       OR EXISTS (SELECT 1
+                  FROM dbo.dnp_Cabecera_Brief c
+                  JOIN dbo.dnp_Estatus_Brief e ON e.ID_STATUS = c.OTRO
+                  WHERE c.NO_PROYECTO = @Proyecto AND e.ES_PAUSA = 1)
+        RETURN '';
+
+    SELECT TOP 1 @forma = FORMA FROM dbo.dnp_Botella_Brief WHERE NO_PROYECTO = @Proyecto;
+
+    IF ISNULL(@forma, '') = ''
+        SET @f += ', Botella';
+    IF @forma <> 'SACHET'
+       AND NOT EXISTS (SELECT 1 FROM dbo.dnp_TapaBrief
+                       WHERE NO_PROYECTO = @Proyecto AND ISNULL(TIPO, '') <> '')
+        SET @f += ', Tapa';
+    IF NOT EXISTS (SELECT 1 FROM dbo.dnp_FundaBrief
+                   WHERE NO_PROYECTO = @Proyecto AND ISNULL(TIPO_MATERIAL, '') <> '')
+        SET @f += ', Etiqueta/Funda';
+    IF NOT EXISTS (SELECT 1 FROM dbo.dnp_CorrugadoBrief
+                   WHERE NO_PROYECTO = @Proyecto AND ISNULL(MATERIAL, '') <> '')
+        SET @f += ', Corrugado';
+    IF NOT EXISTS (SELECT 1 FROM dbo.dnp_FormulaBrief
+                   WHERE NO_PROYECTO = @Proyecto AND ISNULL(INGREDIENTES, '') <> '')
+        SET @f += ', Fórmula';
+    IF NOT EXISTS (SELECT 1 FROM dbo.dnp_FormulaBrief
+                   WHERE NO_PROYECTO = @Proyecto AND ISNULL(IMAGENREFERENCIA, '') <> '')
+        SET @f += ', Imagen';
+
+    RETURN CASE WHEN @f = '' THEN '' ELSE STUFF(@f, 1, 2, '') END;
+END
+GO
+
+/* -------------------------------------------------------------------------------------
    2b. dnp_spBriefPausarVersionPendiente
    La versión 00 nace PENDIENTE al guardar la cabecera, pero el proyecto sigue editable
    para que llenen el Brief. Al guardar Legales, Brief llama este SP: si hay una versión
    PENDIENTE y el proyecto aún no está en pausa, lo pausa hasta que se apruebe.
+   Antes valida que la primera versión esté completa (error 50020 con lo que falta).
    Si no hay nada pendiente o ya está en pausa, no hace nada.
    ------------------------------------------------------------------------------------- */
 CREATE OR ALTER PROCEDURE [dbo].[dnp_spBriefPausarVersionPendiente]
@@ -216,7 +268,7 @@ BEGIN
     SET XACT_ABORT ON;
 
     DECLARE @propia BIT = CASE WHEN @@TRANCOUNT = 0 THEN 1 ELSE 0 END;
-    DECLARE @pausa VARCHAR(20);
+    DECLARE @pausa VARCHAR(20), @falta VARCHAR(200), @msg NVARCHAR(400);
 
     IF @propia = 1 BEGIN TRAN;
 
@@ -229,6 +281,13 @@ BEGIN
                        JOIN dbo.dnp_Estatus_Brief e ON e.ID_STATUS = c.OTRO
                        WHERE c.NO_PROYECTO = @Proyecto AND e.ES_PAUSA = 1)
     BEGIN
+        SET @falta = dbo.dnp_fnBriefFaltantesPrimeraVersion(@Proyecto);
+        IF @falta <> ''
+        BEGIN
+            SET @msg = N'Para cerrar la primera versión falta capturar: ' + @falta + N'.';
+            THROW 50020, @msg, 1;
+        END
+
         SELECT TOP 1 @pausa = ID_STATUS
         FROM dbo.dnp_Estatus_Brief
         WHERE ES_PAUSA = 1 AND ACTIVO = 1 AND PERMITE_EDICION = 0
@@ -345,7 +404,7 @@ WHERE e.ACTIVO = 1 AND e.PERMITE_EDICION = 1 AND ISNULL(e.ES_PAUSA, 0) = 0
 -- 5c. Debe regresar VACÍO: objetos que usa el control de cambios y no existen.
 SELECT Tipo, Nombre AS ObjetoFaltante
 FROM (VALUES
-    ('P','dnp_spBriefBloquear'), ('P','dnp_spBriefLiberarPausa'), ('P','dnp_spBriefPausarVersionPendiente'), ('P','dnp_spBriefCambiarEstatus'),
+    ('P','dnp_spBriefBloquear'), ('P','dnp_spBriefLiberarPausa'), ('P','dnp_spBriefPausarVersionPendiente'), ('FN','dnp_fnBriefFaltantesPrimeraVersion'), ('P','dnp_spBriefCambiarEstatus'),
     ('P','dnp_spGuardaVersion'), ('P','dnp_spObtenerAprobacion'), ('P','sp_FiltraAprobaciones'),
     ('U','dnp_Estatus_Brief'), ('U','dnp_Estatus_Brief_Transicion'),
     ('U','dnp_Estatus_Brief_Historial'), ('U','dnp_Brief_Admin')
