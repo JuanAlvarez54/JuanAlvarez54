@@ -91,7 +91,7 @@ catch (Exception ex)
 
 ### 3. La versión 00 se bloquea al guardar Legales
 
-Al guardar la cabecera de un proyecto nuevo se crea la versión 00 en `PENDIENTE`, pero **sin pausa**, para que puedan llenar el Brief. Al guardar **Legales**, el proyecto pasa a `PAUSA` y queda bloqueado hasta que un administrador apruebe la versión 00.
+Al guardar la cabecera de un proyecto nuevo se crea la versión 00 en `PENDIENTE`, pero **sin pausa**, para que puedan capturar Botella, Tapa, Etiqueta/Funda, Corrugado, Fórmula, Imagen y Legales. **Legales es el último apartado**: solo se puede guardar cuando lo demás está completo, y al guardarlo el proyecto pasa a `PAUSA` hasta que un administrador apruebe la versión 00. Las versiones siguientes se registran con TERMINAR y se pausan como siempre; para ellas Legales no exige nada.
 
 **`ActualizaCabecera`**: la versión 00 se crea con `@Pausar = false` y ya no se llama `AplicarModoEdicion`:
 
@@ -132,6 +132,18 @@ protected void ActualizaLegales(object sender, EventArgs e)
 
         using (DNPEntities5 db = new DNPEntities5())
         {
+            // Primera versión: Legales es el último apartado; antes debe estar capturado todo lo demás
+            string faltantes = db.Database.SqlQuery<string>(
+                "SELECT dbo.dnp_fnBriefFaltantesPrimeraVersion(@p)",
+                new SqlParameter("@p", lblProyectoCotiza.Text)).FirstOrDefault();
+
+            if (!string.IsNullOrEmpty(faltantes))
+            {
+                MostrarToast("Legales es el último apartado de la primera versión. Antes captura: " + faltantes + ".",
+                             ToastTipo.Warning, "Brief incompleto");
+                return;
+            }
+
             db.sp_ActualizaLegalBrief(lblProyectoCotiza.Text, txtlegal.Text, txtotrosobs.Text, reqLegal, txtEsp.Text);
 
             // La versión 00 nace PENDIENTE al crear el proyecto; al completar Legales se bloquea
@@ -155,7 +167,7 @@ protected void ActualizaLegales(object sender, EventArgs e)
 }
 ```
 
-`dnp_spGuardaVersion` ya no aprueba en automático la versión 00 (se quitó la línea `(*)`), y el SP nuevo `dnp_spBriefPausarVersionPendiente` (sección 2b de `01_control_cambios_brief.sql`) aplica la pausa.
+`dnp_spGuardaVersion` ya no aprueba en automático la versión 00 (se quitó la línea `(*)`), el SP nuevo `dnp_spBriefPausarVersionPendiente` (sección 2b de `01_control_cambios_brief.sql`) aplica la pausa, y la función `dnp_fnBriefFaltantesPrimeraVersion` (sección 2a) dice qué falta. El SP vuelve a validarlo (error 50020), así que una versión 00 incompleta no se puede cerrar aunque se salte la validación de la pantalla.
 
 ## Pendientes fuera de este paquete
 
