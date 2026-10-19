@@ -91,7 +91,7 @@ catch (Exception ex)
 
 ### 3. La versión 00 se bloquea al guardar Legales
 
-Al guardar la cabecera de un proyecto nuevo se crea la versión 00 en `PENDIENTE`, pero **sin pausa**, para que puedan capturar Botella, Tapa, Etiqueta/Funda, Corrugado, Fórmula, Imagen y Legales. **Legales es el último apartado**: solo se puede guardar cuando lo demás está completo, y al guardarlo el proyecto pasa a `PAUSA` hasta que un administrador apruebe la versión 00. Las versiones siguientes se registran con TERMINAR y se pausan como siempre; para ellas Legales no exige nada.
+Al guardar la cabecera de un proyecto nuevo se crea la versión 00 en `PENDIENTE`, pero **sin pausa**, para que puedan capturar Botella, Tapa, Etiqueta/Funda, Corrugado, Fórmula y Legales (la Imagen es opcional). **Legales es el último apartado**: solo se puede guardar cuando lo demás está completo, y al guardarlo el proyecto pasa a `PAUSA` hasta que un administrador apruebe la versión 00. Las versiones siguientes se registran con TERMINAR y se pausan como siempre; para ellas Legales no exige nada.
 
 **`ActualizaCabecera`**: la versión 00 se crea con `@Pausar = false` y ya no se llama `AplicarModoEdicion`:
 

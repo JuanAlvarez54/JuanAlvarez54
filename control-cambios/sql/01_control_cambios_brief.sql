@@ -207,7 +207,8 @@ GO
    devuelve las secciones que faltan por capturar, separadas por coma. Devuelve ''
    si no falta nada o si el proyecto no está en esa etapa (versiones posteriores).
    Se revisa un dato obligatorio de cada sección, así funciona aunque la fila exista
-   vacía. Los proyectos SACHET no llevan Tapa.
+   vacía. Los proyectos SACHET no llevan Tapa. La Imagen es opcional (se puede
+   capturar después).
    ------------------------------------------------------------------------------------- */
 CREATE OR ALTER FUNCTION [dbo].[dnp_fnBriefFaltantesPrimeraVersion]
 (
@@ -243,9 +244,6 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM dbo.dnp_FormulaBrief
                    WHERE NO_PROYECTO = @Proyecto AND ISNULL(INGREDIENTES, '') <> '')
         SET @f += ', Fórmula';
-    IF NOT EXISTS (SELECT 1 FROM dbo.dnp_FormulaBrief
-                   WHERE NO_PROYECTO = @Proyecto AND ISNULL(IMAGENREFERENCIA, '') <> '')
-        SET @f += ', Imagen';
 
     RETURN CASE WHEN @f = '' THEN '' ELSE STUFF(@f, 1, 2, '') END;
 END
