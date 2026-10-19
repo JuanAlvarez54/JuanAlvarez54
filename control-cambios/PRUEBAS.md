@@ -26,16 +26,16 @@ SELECT * FROM dnp_Estatus_Brief_Historial WHERE NO_PROYECTO = @p ORDER BY 1;
 
 | # | Quién / dónde | Acción | Resultado esperado en pantalla | En la BD |
 |---|---|---|---|---|
-| 1 | Capturista, Brief | Crear proyecto: llenar la cabecera y guardar | "Guardado Correctamente"; aparece el código del proyecto; el grid de versiones queda vacío | `Estatus = NUEVO`; **sin versiones** |
-| 2 | Capturista, Brief | Llenar y guardar Botella, Tapa, Funda, Corrugado, Fórmula y Legales | Cada sección dice "Guardado correctamente" | Sin cambios de estatus |
-| 3 | Capturista, Brief | Presionar MODIFICAR → escribir la justificación ("Alta del proyecto") → TERMINAR | "Guardado"; se abre el aviso "Proyecto en pausa"; aparece el chip de pausa; los controles quedan deshabilitados | Versión `00` `PENDIENTE`; `Estatus = PAUSA`; historial `NUEVO → PAUSA` (`SISTEMA`) |
+| 1 | Capturista, Brief | Crear proyecto: llenar la cabecera y guardar | "Guardado Correctamente"; aparece el código del proyecto; se abre el aviso "Proyecto en pausa"; aparece el chip de pausa; los controles quedan deshabilitados | Versión `00` `PENDIENTE` (descripción `NUEVA`); `Estatus = PAUSA`; historial `NUEVO → PAUSA` (`SISTEMA`) |
+| 2 | Capturista, Brief | Recorrer Botella, Tapa, Funda, Corrugado y Legales | Todo deshabilitado; los botones de guardar muestran el tooltip de pausa | Sin cambios |
+| 3 | Capturista, Brief | Recargar la página y volver a seleccionar el proyecto | Sigue bloqueado y vuelve a abrir el aviso | Sin cambios |
 | 4 | Capturista, Brief | Recorrer todas las secciones, incluida **Fórmula** | Todo sigue deshabilitado, también en Fórmula | Sin cambios |
 | 5 | Capturista, Brief | Entrar a Firmas | "Acceso denegado. El proyecto no está en un estatus que permita firmar." | Sin cambios |
 | 6 | Capturista, Brief | Intentar TERMINAR otra vez (si el botón está habilitado) | "Candado de aprobación" | Sigue habiendo **una sola** versión `PENDIENTE` |
 | 7 | Capturista, Aprobaciones | Seleccionar la versión 00 y presionar Aprobar con comentario | "Acceso denegado. No tiene permiso para aprobar esta versión." | Sin cambios |
 | 8 | Administrador, Aprobaciones | Seleccionar la versión 00 y presionar Aprobar **sin** comentario | "Debe ingresar un comentario…" | Sin cambios |
 | 9 | Administrador, Aprobaciones | Escribir un comentario y presionar Aprobar | "La versión ha sido aprobada correctamente."; la versión desaparece de la lista | Versión `00` `APROBADO`, con usuario y motivo; `Estatus = NUEVO`; historial `PAUSA → NUEVO` (`SISTEMA`) |
-| 10 | Capturista, Brief | **Volver a seleccionar** el proyecto en la lista | Ya no aparecen el chip ni el aviso; todo es editable | Sin cambios |
+| 10 | Capturista, Brief | **Volver a seleccionar** el proyecto en la lista | Ya no aparecen el chip ni el aviso; todo es editable. Llenar y guardar Botella, Tapa, Funda, Corrugado, Fórmula y Legales | Sin cambios |
 | 11 | Capturista, Brief | Cambiar un dato, guardar y hacer TERMINAR con justificación | Pausa otra vez, igual que en el paso 3 | Versión `01` `PENDIENTE`; `Estatus = PAUSA` |
 | 12 | Administrador, Aprobaciones | Rechazar la versión 01 con comentario | "La versión ha sido rechazada correctamente." | Versión `01` `RECHAZADO`; `Estatus = NUEVO` |
 | 13 | Capturista, Brief | Volver a seleccionar el proyecto | Editable. El dato cambiado en el paso 11 **se queda**: rechazar no deshace los cambios guardados | Sin cambios |

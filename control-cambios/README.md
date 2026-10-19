@@ -89,48 +89,31 @@ catch (Exception ex)
 }
 ```
 
-### 3. La versión 00 también se bloquea (al primer TERMINAR)
+### 3. La versión 00 bloquea el proyecto desde que se crea
 
-Hoy `ActualizaCabecera` crea la versión 00 en cuanto se guarda la cabecera, sin pausar. Con este cambio, la cabecera ya no crea versión. La versión 00 nace en el **primer TERMINAR**, igual que las demás: queda `PENDIENTE`, el proyecto pasa a `PAUSA` y se bloquea hasta que un administrador la apruebe. Así el usuario puede llenar todas las secciones del Brief antes de mandarlo a validación.
+Al guardar la cabecera de un proyecto nuevo se crea la versión 00 automáticamente. Ahora se crea con `@Pausar = 1`: queda `PENDIENTE`, el proyecto pasa a `PAUSA` y se bloquea hasta que un administrador la apruebe. Mientras tanto no se pueden llenar las demás secciones.
 
-En `ActualizaCabecera`, reemplaza desde `string Username = ...` hasta la recarga del grid (`clIdent.CargarDataGrid(...)` en el `if/else`) por:
+En `ActualizaCabecera`, la llamada a `dnp_spGuardaVersion` queda así (se agrega `@Pausar`):
 
 ```csharp
-string tipo_proyecto = DropTP.SelectedValue;
-
-// Guardar si es proyecto nuevo (antes de actualizar)
-bool esProyectoNuevo = (lblProyectoCotiza.Text == "NUEVO");
-
-db.sp_ActualizaCabeceraBrief(lblProyectoCotiza.Text, Convert.ToInt32(dpSolicitaCoti.SelectedValue), txtprodCoti.Text, Convert.ToInt32(txtcajasCoti.Text), tipoMaquila, "NUEVO", tipo_proyecto);
-
-// La versión 00 ya no se crea aquí: nace en el primer TERMINAR y deja el proyecto en PAUSA.
-if (esProyectoNuevo)
-{
-    string codigoGenerado = db.Database.SqlQuery<string>(
-        @"SELECT TOP 1 NO_PROYECTO
-          FROM dnp_Cabecera_Brief
-          WHERE PRODUCTO = @proyecto
-          AND ID_CLIENTE = @Cliente
-          AND TIPO_MAQUILA = @tipoMaq
-          AND NO_PROYECTO <> 'NUEVO'
-          ORDER BY SYSTEM_DATE DESC",
-        new SqlParameter("@proyecto", txtprodCoti.Text),
-        new SqlParameter("@Cliente", Convert.ToInt32(dpSolicitaCoti.SelectedValue)),
-        new SqlParameter("@tipoMaq", tipoMaquila)
-    ).FirstOrDefault();
-
-    if (!string.IsNullOrEmpty(codigoGenerado))
-        lblProyectoCotiza.Text = codigoGenerado;
-}
-
-clIdent.CargarDataGrid(ref dgVersionDNP, lblProyectoCotiza.Text, "dnp_spObtenerVersionesPerfil");
+db.Database.ExecuteSqlCommand(
+    "EXEC dnp_spGuardaVersion @Codigo, @usr, @cambio, @sCambio, @Pausar",
+    new SqlParameter("@Codigo", codigoGenerado),
+    new SqlParameter("@usr", Username),
+    new SqlParameter("@cambio", "NUEVA"),
+    new SqlParameter("@sCambio", false),
+    new SqlParameter("@Pausar", true)
+);
 ```
 
-Este reemplazo corrige además otro error: antes, al editar la cabecera de un proyecto existente, el grid de versiones se recargaba con el **último proyecto del mismo producto, cliente y maquila**, que podía ser otro proyecto.
+Y después de `lblProyectoCotiza.Text = codigoGenerado;` se aplica el bloqueo en la pantalla:
 
-`dnp_spGuardaVersion` no necesita cambios: el C# de TERMINAR ya manda `@Pausar = 1`, y con eso la versión 00 queda `PENDIENTE`. La línea `(*)` del SP solo aplicaba a la versión creada desde la cabecera. Puedes dejarla o quitarla.
+```csharp
+setTitle(codigoGenerado, txtprodCoti.Text);
+AplicarModoEdicion(codigoGenerado, true);
+```
 
-> Alternativa, si quieres que se bloquee desde que se guarda la cabecera: no apliques este cambio. En su lugar, agrega `new SqlParameter("@Pausar", true)` (y `@Pausar` al `EXEC`) en la creación de la versión 00 de `ActualizaCabecera`. El inconveniente es que el usuario no podrá llenar Botella, Tapa, Fórmula, etc. hasta que se apruebe.
+El `catch` muestra los mensajes de negocio de los SP (por ejemplo 50004 si falta la transición `NUEVO → PAUSA`), igual que en `btnGuardarCambios_Click`.
 
 ## Pendientes fuera de este paquete
 
