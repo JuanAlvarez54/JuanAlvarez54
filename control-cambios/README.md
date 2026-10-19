@@ -5,6 +5,7 @@
 | Archivo | Qué hace |
 |---|---|
 | `sql/00_tablas_control_cambios_brief.sql` | Tablas del control de cambios (idempotente) y exportación de su configuración |
+| `sql/02_datos_estatus_brief.sql` | Datos iniciales del catálogo de estatus y transiciones (si están vacíos) |
 | `sql/01_control_cambios_brief.sql` | SP corregidos, verificación de configuración y corrección opcional de datos |
 | `csharp/Brief_campos_static.md` | Quitar los campos `static` y `req_legal` de Brief.aspx.cs |
 | `csharp/Aprobacion.aspx.cs` | Reemplazo completo de la página de Aprobaciones |
