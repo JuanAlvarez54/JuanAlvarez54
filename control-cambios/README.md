@@ -6,6 +6,7 @@
 |---|---|
 | `sql/00_tablas_control_cambios_brief.sql` | Tablas del control de cambios (idempotente) y exportación de su configuración |
 | `sql/01_control_cambios_brief.sql` | SP corregidos, verificación de configuración y corrección opcional de datos |
+| `csharp/Brief_campos_static.md` | Quitar los campos `static` y `req_legal` de Brief.aspx.cs |
 | `csharp/Aprobacion.aspx.cs` | Reemplazo completo de la página de Aprobaciones |
 | Este README, sección "Brief.aspx.cs" | Dos cambios puntuales en Brief |
 
@@ -88,5 +89,4 @@ catch (Exception ex)
 
 ## Pendientes fuera de este paquete
 
-- **Campos `static` en Brief.aspx.cs** (`tipoMaquila`, `formula`, `colorf`, `bloqueadores`…). Se comparten entre todos los usuarios del servidor. Corregirlo requiere revisar cada `Actualiza*`, porque algunos dependen de que el valor sobreviva entre postbacks, así que conviene hacerlo por separado.
 - **Credenciales escritas en el código** (LDAP y Report Server). Pásalas a `web.config` cifrado y cambia esa contraseña.
