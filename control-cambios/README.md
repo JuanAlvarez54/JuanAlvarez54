@@ -4,6 +4,7 @@
 
 | Archivo | Qué hace |
 |---|---|
+| `sql/00_tablas_control_cambios_brief.sql` | Tablas del control de cambios (idempotente) y exportación de su configuración |
 | `sql/01_control_cambios_brief.sql` | SP corregidos, verificación de configuración y corrección opcional de datos |
 | `csharp/Aprobacion.aspx.cs` | Reemplazo completo de la página de Aprobaciones |
 | Este README, sección "Brief.aspx.cs" | Dos cambios puntuales en Brief |
@@ -11,7 +12,8 @@
 ## Orden de aplicación
 
 1. **Respaldo** de los SP actuales: en SSMS, clic derecho en el SP → *Incluir procedimiento como* → *ALTER en*.
-2. Ejecutar `sql/01_control_cambios_brief.sql` (secciones 1 a 4).
+2. **Solo en una base nueva** (p. ej. producción): ejecutar `sql/00_tablas_control_cambios_brief.sql`, después los INSERT que genera su sección de exportación (corrida en la base que ya funciona) y luego crear `dnp_spBriefCambiarEstatus`. En la base donde ya funciona no hace falta: el script no toca tablas existentes.
+2b. Ejecutar `sql/01_control_cambios_brief.sql` (secciones 1 a 4).
 3. Revisar los resultados de la **sección 5**. 5b, 5c y 5d deben salir vacías, y 5a debe mostrar un estatus de pausa con `ESTATUS_AL_LIBERAR`, `DestinoActivo = 1` y `TransicionLiberar` distinto de NULL.
 4. Decidir la **sección 6** (versiones iniciales PENDIENTE que ya existen) y, si aplica, descomentar el UPDATE.
 5. Reemplazar `Aprobacion.aspx.cs` y aplicar los cambios de `Brief.aspx.cs` (abajo).
