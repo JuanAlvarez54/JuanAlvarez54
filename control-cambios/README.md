@@ -12,12 +12,12 @@
 ## Orden de aplicación
 
 1. **Respaldo** de los SP actuales: en SSMS, clic derecho en el SP → *Incluir procedimiento como* → *ALTER en*.
-2. **Solo en una base nueva** (p. ej. producción): ejecutar `sql/00_tablas_control_cambios_brief.sql`, después los INSERT que genera su sección de exportación (corrida en la base que ya funciona) y luego crear `dnp_spBriefCambiarEstatus`. En la base donde ya funciona no hace falta: el script no toca tablas existentes.
-2b. Ejecutar `sql/01_control_cambios_brief.sql` (secciones 1 a 4).
-3. Revisar los resultados de la **sección 5**. 5b, 5c y 5d deben salir vacías, y 5a debe mostrar un estatus de pausa con `ESTATUS_AL_LIBERAR`, `DestinoActivo = 1` y `TransicionLiberar` distinto de NULL.
-4. Decidir la **sección 6** (versiones iniciales PENDIENTE que ya existen) y, si aplica, descomentar el UPDATE.
-5. Reemplazar `Aprobacion.aspx.cs` y aplicar los cambios de `Brief.aspx.cs` (abajo).
-6. Probar el flujo: crear proyecto → TERMINAR con cambio → (en pausa) entrar a Fórmula → aprobar → repetir con rechazar.
+2. **Solo en una base nueva** (p. ej. producción): ejecutar `sql/00_tablas_control_cambios_brief.sql` y después los INSERT que genera su sección de exportación (corrida en la base que ya funciona). En la base donde ya funciona no hace falta: el script no toca tablas existentes.
+3. Ejecutar `sql/01_control_cambios_brief.sql` (secciones 0 a 4; la 0 es `dnp_spBriefCambiarEstatus` sin cambios de lógica).
+4. Revisar los resultados de la **sección 5**. 5b, 5c y 5d deben salir vacías, y 5a debe mostrar un estatus de pausa con `ESTATUS_AL_LIBERAR`, `DestinoActivo = 1` y `TransicionLiberar` distinto de NULL.
+5. Decidir la **sección 6** (versiones iniciales PENDIENTE que ya existen) y, si aplica, descomentar el UPDATE.
+6. Reemplazar `Aprobacion.aspx.cs` y aplicar los cambios de `Brief.aspx.cs` (abajo).
+7. Probar el flujo: crear proyecto → TERMINAR con cambio → (en pausa) entrar a Fórmula → aprobar → repetir con rechazar.
 
 ## Qué cambia
 

@@ -12,8 +12,7 @@
    Orden de despliegue en una base nueva:
      1. Este script (tablas y columnas)
      2. Datos de configuración (sección 4, generados desde la base que ya funciona)
-     3. dnp_spBriefCambiarEstatus (no incluido aquí: tómalo de la base que ya funciona)
-     4. 01_control_cambios_brief.sql (resto de los SP)
+     3. 01_control_cambios_brief.sql (todos los SP, incluido dnp_spBriefCambiarEstatus)
    ===================================================================================== */
 USE [DNP]
 GO

@@ -3,6 +3,7 @@
    Base: DNP
 
    Orden:
+     0. dnp_spBriefCambiarEstatus  (sin cambios de lógica; incluido para desplegar en otra base)
      1. dnp_spBriefBloquear        (bloqueo del proyecto; ya creado, se deja idempotente)
      2. dnp_spGuardaVersion        (candado en BD, versión inicial aprobada, pausa obligatoria)
      3. dnp_spBriefLiberarPausa    (error explícito si la pausa no está configurada)
@@ -13,6 +14,82 @@
    Requiere SQL Server 2016 SP1 o superior (CREATE OR ALTER, THROW).
    ===================================================================================== */
 USE [DNP]
+GO
+
+/* -------------------------------------------------------------------------------------
+   0. dnp_spBriefCambiarEstatus
+   Único punto de cambio de estatus. Misma lógica que la versión en uso; se incluye
+   para que una base nueva quede completa. Valida estatus destino activo (50002),
+   asignación manual (50003), transición permitida (50004) y administrador (50005).
+   Si lo llama otro SP dentro de su transacción (@@TRANCOUNT > 0), no abre la suya.
+   ------------------------------------------------------------------------------------- */
+CREATE OR ALTER PROCEDURE [dbo].[dnp_spBriefCambiarEstatus]
+    @Proyecto VARCHAR(20),
+    @Destino  VARCHAR(20),
+    @Usuario  VARCHAR(50),
+    @Motivo   VARCHAR(200) = NULL,
+    @Manual   BIT = 1
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @propia BIT = CASE WHEN @@TRANCOUNT = 0 THEN 1 ELSE 0 END;
+    DECLARE @origen VARCHAR(20), @reqAdmin BIT, @reinicia BIT, @manualOk BIT, @activo BIT;
+
+    IF @propia = 1 BEGIN TRAN;
+
+    SELECT @origen = OTRO
+    FROM dbo.dnp_Cabecera_Brief WITH (UPDLOCK, ROWLOCK)
+    WHERE NO_PROYECTO = @Proyecto;
+
+    IF @@ROWCOUNT = 0
+        THROW 50001, 'El proyecto no existe.', 1;
+
+    IF @origen = @Destino
+    BEGIN
+        IF @propia = 1 COMMIT;
+        RETURN;
+    END
+
+    SELECT @reinicia = REINICIA_FIRMAS, @manualOk = SELECCIONABLE_MANUAL, @activo = ACTIVO
+    FROM dbo.dnp_Estatus_Brief
+    WHERE ID_STATUS = @Destino;
+
+    IF @activo IS NULL OR @activo = 0
+        THROW 50002, 'El estatus destino no existe o está inactivo.', 1;
+
+    IF @Manual = 1 AND @manualOk = 0
+        THROW 50003, 'Ese estatus no se puede asignar manualmente.', 1;
+
+    SELECT @reqAdmin = REQUIERE_ADMIN
+    FROM dbo.dnp_Estatus_Brief_Transicion
+    WHERE ORIGEN = @origen AND DESTINO = @Destino;
+
+    IF @reqAdmin IS NULL
+        THROW 50004, 'Cambio de estatus no permitido para el estado actual del proyecto.', 1;
+
+    IF @reqAdmin = 1
+       AND NOT EXISTS (SELECT 1 FROM dbo.dnp_Brief_Admin WHERE USUARIO = @Usuario)
+        THROW 50005, 'Solo un Administrador puede realizar este cambio de estatus.', 1;
+
+    UPDATE dbo.dnp_Cabecera_Brief
+    SET OTRO = @Destino
+    WHERE NO_PROYECTO = @Proyecto;
+
+    IF @reinicia = 1
+        UPDATE dbo.dnp_ProyectoBrief_Firma
+        SET VENTAS = '', COSTOS = '', DESARROLLO = '', DIRECCION = '', VALIDACION = '',
+            SYSTEM_DATE = GETDATE()
+        WHERE NO_PROYECTO = @Proyecto;
+
+    INSERT INTO dbo.dnp_Estatus_Brief_Historial
+        (NO_PROYECTO, ESTATUS_ORIGEN, ESTATUS_DESTINO, USUARIO, MOTIVO, ORIGEN_ACCION)
+    VALUES
+        (@Proyecto, @origen, @Destino, @Usuario, @Motivo, CASE WHEN @Manual = 1 THEN 'MANUAL' ELSE 'SISTEMA' END);
+
+    IF @propia = 1 COMMIT;
+END
 GO
 
 /* -------------------------------------------------------------------------------------
@@ -50,7 +127,7 @@ GO
      - Si se pide pausar y no hay estatus de pausa válido, o la pausa no se aplica,
        se lanza un error y no se registra nada (antes fallaba en silencio).
    ------------------------------------------------------------------------------------- */
-ALTER PROCEDURE [dbo].[dnp_spGuardaVersion]
+CREATE OR ALTER PROCEDURE [dbo].[dnp_spGuardaVersion]
     @Codigo  AS VARCHAR(50),
     @usr     AS VARCHAR(50),
     @cambio  AS VARCHAR(MAX),
@@ -130,7 +207,7 @@ GO
    "está en pausa pero sin ESTATUS_AL_LIBERAR" (error: antes aprobaba la versión
    y dejaba el proyecto en pausa para siempre).
    ------------------------------------------------------------------------------------- */
-ALTER PROCEDURE [dbo].[dnp_spBriefLiberarPausa]
+CREATE OR ALTER PROCEDURE [dbo].[dnp_spBriefLiberarPausa]
     @Proyecto VARCHAR(20),
     @Usuario  VARCHAR(50),
     @Motivo   VARCHAR(200) = NULL
@@ -169,7 +246,7 @@ GO
    tabla no aparecía en Aprobaciones y el proyecto se quedaba en pausa sin poder
    aprobarse. @busqueda se amplía a 100 caracteres.
    ------------------------------------------------------------------------------------- */
-ALTER PROCEDURE [dbo].[dnp_spObtenerAprobacion]
+CREATE OR ALTER PROCEDURE [dbo].[dnp_spObtenerAprobacion]
     @busqueda AS VARCHAR(100)
 AS
 BEGIN
