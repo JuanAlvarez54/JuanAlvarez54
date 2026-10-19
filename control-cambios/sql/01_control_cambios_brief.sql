@@ -5,7 +5,8 @@
    Orden:
      0. dnp_spBriefCambiarEstatus  (sin cambios de lógica; incluido para desplegar en otra base)
      1. dnp_spBriefBloquear        (bloqueo del proyecto; ya creado, se deja idempotente)
-     2. dnp_spGuardaVersion        (candado en BD, versión inicial aprobada, pausa obligatoria)
+     2. dnp_spGuardaVersion        (candado en BD, versión inicial pendiente, pausa obligatoria)
+     2b. dnp_spBriefPausarVersionPendiente (pausa la versión 00 al guardar Legales)
      3. dnp_spBriefLiberarPausa    (error explícito si la pausa no está configurada)
      4. dnp_spObtenerAprobacion    (no ocultar versiones de usuarios fuera de dnp_Llenado)
      5. Verificación de configuración (solo lectura)
@@ -121,9 +122,8 @@ GO
    Cambios respecto a la versión anterior:
      - Bloquea el proyecto antes de tocar dnp_Brief_Version (mismo orden que Aprobación).
      - El candado "una sola versión PENDIENTE" vive aquí, no solo en el C#.
-     - La versión inicial (00) sin pausa nace APROBADO: ya no bloquea el primer TERMINAR.
-       Si la versión inicial SÍ debe esperar validación, elimina la línea marcada (*)
-       y haz que ActualizaCabecera mande @Pausar = 1.
+     - La versión inicial (00) se crea al guardar la cabecera, PENDIENTE y sin pausa
+       (@Pausar = 0); el proyecto se pausa al guardar Legales (sección 2b).
      - Si se pide pausar y no hay estatus de pausa válido, o la pausa no se aplica,
        se lanza un error y no se registra nada (antes fallaba en silencio).
    ------------------------------------------------------------------------------------- */
@@ -172,7 +172,6 @@ BEGIN
     ELSE
     BEGIN
         SET @VERSION_FORMAT = '00';
-        IF @Pausar = 0 SET @EstatusVersion = 'APROBADO';   -- (*) versión inicial no espera validación
     END
 
     INSERT INTO dbo.dnp_Brief_Version (NO_PROYECTO, [Version], FechaAprob, Descripcion, Usuario, Estatus)
@@ -198,6 +197,52 @@ BEGIN
     END
 
     COMMIT;
+END
+GO
+
+/* -------------------------------------------------------------------------------------
+   2b. dnp_spBriefPausarVersionPendiente
+   La versión 00 nace PENDIENTE al guardar la cabecera, pero el proyecto sigue editable
+   para que llenen el Brief. Al guardar Legales, Brief llama este SP: si hay una versión
+   PENDIENTE y el proyecto aún no está en pausa, lo pausa hasta que se apruebe.
+   Si no hay nada pendiente o ya está en pausa, no hace nada.
+   ------------------------------------------------------------------------------------- */
+CREATE OR ALTER PROCEDURE [dbo].[dnp_spBriefPausarVersionPendiente]
+    @Proyecto VARCHAR(20),
+    @Usuario  VARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @propia BIT = CASE WHEN @@TRANCOUNT = 0 THEN 1 ELSE 0 END;
+    DECLARE @pausa VARCHAR(20);
+
+    IF @propia = 1 BEGIN TRAN;
+
+    EXEC dbo.dnp_spBriefBloquear @Proyecto = @Proyecto;
+
+    IF EXISTS (SELECT 1 FROM dbo.dnp_Brief_Version
+               WHERE NO_PROYECTO = @Proyecto AND Estatus = 'PENDIENTE')
+       AND NOT EXISTS (SELECT 1
+                       FROM dbo.dnp_Cabecera_Brief c
+                       JOIN dbo.dnp_Estatus_Brief e ON e.ID_STATUS = c.OTRO
+                       WHERE c.NO_PROYECTO = @Proyecto AND e.ES_PAUSA = 1)
+    BEGIN
+        SELECT TOP 1 @pausa = ID_STATUS
+        FROM dbo.dnp_Estatus_Brief
+        WHERE ES_PAUSA = 1 AND ACTIVO = 1 AND PERMITE_EDICION = 0
+        ORDER BY ORDEN;
+
+        IF @pausa IS NULL
+            THROW 50011, 'No hay un estatus de pausa activo (ES_PAUSA = 1, PERMITE_EDICION = 0) en dnp_Estatus_Brief.', 1;
+
+        EXEC dbo.dnp_spBriefCambiarEstatus
+             @Proyecto = @Proyecto, @Destino = @pausa, @Usuario = @Usuario,
+             @Motivo = 'Versión pendiente de validación', @Manual = 0;
+    END
+
+    IF @propia = 1 COMMIT;
 END
 GO
 
@@ -300,7 +345,7 @@ WHERE e.ACTIVO = 1 AND e.PERMITE_EDICION = 1 AND ISNULL(e.ES_PAUSA, 0) = 0
 -- 5c. Debe regresar VACÍO: objetos que usa el control de cambios y no existen.
 SELECT Tipo, Nombre AS ObjetoFaltante
 FROM (VALUES
-    ('P','dnp_spBriefBloquear'), ('P','dnp_spBriefLiberarPausa'), ('P','dnp_spBriefCambiarEstatus'),
+    ('P','dnp_spBriefBloquear'), ('P','dnp_spBriefLiberarPausa'), ('P','dnp_spBriefPausarVersionPendiente'), ('P','dnp_spBriefCambiarEstatus'),
     ('P','dnp_spGuardaVersion'), ('P','dnp_spObtenerAprobacion'), ('P','sp_FiltraAprobaciones'),
     ('U','dnp_Estatus_Brief'), ('U','dnp_Estatus_Brief_Transicion'),
     ('U','dnp_Estatus_Brief_Historial'), ('U','dnp_Brief_Admin')

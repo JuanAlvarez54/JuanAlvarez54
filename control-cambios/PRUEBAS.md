@@ -26,9 +26,9 @@ SELECT * FROM dnp_Estatus_Brief_Historial WHERE NO_PROYECTO = @p ORDER BY 1;
 
 | # | Quién / dónde | Acción | Resultado esperado en pantalla | En la BD |
 |---|---|---|---|---|
-| 1 | Capturista, Brief | Crear proyecto: llenar la cabecera y guardar | "Guardado Correctamente"; aparece el código del proyecto; se abre el aviso "Proyecto en pausa"; aparece el chip de pausa; los controles quedan deshabilitados | Versión `00` `PENDIENTE` (descripción `NUEVA`); `Estatus = PAUSA`; historial `NUEVO → PAUSA` (`SISTEMA`) |
-| 2 | Capturista, Brief | Recorrer Botella, Tapa, Funda, Corrugado y Legales | Todo deshabilitado; los botones de guardar muestran el tooltip de pausa | Sin cambios |
-| 3 | Capturista, Brief | Recargar la página y volver a seleccionar el proyecto | Sigue bloqueado y vuelve a abrir el aviso | Sin cambios |
+| 1 | Capturista, Brief | Crear proyecto: llenar la cabecera y guardar | "Guardado Correctamente"; aparece el código del proyecto; **sigue editable** | Versión `00` `PENDIENTE` (descripción `NUEVA`); `Estatus = NUEVO` |
+| 2 | Capturista, Brief | Llenar y guardar Botella, Tapa, Funda, Corrugado y Fórmula | Cada sección dice "Guardado correctamente" | Sin cambios de estatus |
+| 3 | Capturista, Brief | Llenar y guardar **Legales** | "Guardado Correctamente"; se abre el aviso "Proyecto en pausa"; aparece el chip; los controles quedan deshabilitados | `Estatus = PAUSA`; historial `NUEVO → PAUSA` (`SISTEMA`) |
 | 4 | Capturista, Brief | Recorrer todas las secciones, incluida **Fórmula** | Todo sigue deshabilitado, también en Fórmula | Sin cambios |
 | 5 | Capturista, Brief | Entrar a Firmas | "Acceso denegado. El proyecto no está en un estatus que permita firmar." | Sin cambios |
 | 6 | Capturista, Brief | Intentar TERMINAR otra vez (si el botón está habilitado) | "Candado de aprobación" | Sigue habiendo **una sola** versión `PENDIENTE` |

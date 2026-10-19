@@ -89,11 +89,11 @@ catch (Exception ex)
 }
 ```
 
-### 3. La versión 00 bloquea el proyecto desde que se crea
+### 3. La versión 00 se bloquea al guardar Legales
 
-Al guardar la cabecera de un proyecto nuevo se crea la versión 00 automáticamente. Ahora se crea con `@Pausar = 1`: queda `PENDIENTE`, el proyecto pasa a `PAUSA` y se bloquea hasta que un administrador la apruebe. Mientras tanto no se pueden llenar las demás secciones.
+Al guardar la cabecera de un proyecto nuevo se crea la versión 00 en `PENDIENTE`, pero **sin pausa**, para que puedan llenar el Brief. Al guardar **Legales**, el proyecto pasa a `PAUSA` y queda bloqueado hasta que un administrador apruebe la versión 00.
 
-En `ActualizaCabecera`, la llamada a `dnp_spGuardaVersion` queda así (se agrega `@Pausar`):
+**`ActualizaCabecera`**: la versión 00 se crea con `@Pausar = false` y ya no se llama `AplicarModoEdicion`:
 
 ```csharp
 db.Database.ExecuteSqlCommand(
@@ -102,18 +102,60 @@ db.Database.ExecuteSqlCommand(
     new SqlParameter("@usr", Username),
     new SqlParameter("@cambio", "NUEVA"),
     new SqlParameter("@sCambio", false),
-    new SqlParameter("@Pausar", true)
+    new SqlParameter("@Pausar", false)   // se pausa al guardar Legales
 );
+...
+lblProyectoCotiza.Text = codigoGenerado;
+setTitle(codigoGenerado, txtprodCoti.Text);
 ```
 
-Y después de `lblProyectoCotiza.Text = codigoGenerado;` se aplica el bloqueo en la pantalla:
+**`ActualizaLegales`**: después de guardar, pausa si hay una versión pendiente:
 
 ```csharp
-setTitle(codigoGenerado, txtprodCoti.Text);
-AplicarModoEdicion(codigoGenerado, true);
+protected void ActualizaLegales(object sender, EventArgs e)
+{
+    if (EdicionBloqueada()) return;
+
+    string usuario = UsuarioSesion();
+    if (usuario == null) return;
+
+    try
+    {
+        string reqLegal = radbtn_si.Checked ? "Y" : radbtn_no.Checked ? "N" : "";
+
+        if (txtlegal.Text == "" || txtotrosobs.Text == "" || reqLegal == ""
+            || (reqLegal == "Y" && txtEsp.Text == ""))
+        {
+            Page.ClientScript.RegisterStartupScript(this.GetType(), "Scripts", "<script>alert('Favor de llenar todos los datos.');</script>");
+            return;
+        }
+
+        using (DNPEntities5 db = new DNPEntities5())
+        {
+            db.sp_ActualizaLegalBrief(lblProyectoCotiza.Text, txtlegal.Text, txtotrosobs.Text, reqLegal, txtEsp.Text);
+
+            // La versión 00 nace PENDIENTE al crear el proyecto; al completar Legales se bloquea
+            db.Database.ExecuteSqlCommand(
+                "EXEC dnp_spBriefPausarVersionPendiente @Proyecto, @Usuario",
+                new SqlParameter("@Proyecto", lblProyectoCotiza.Text),
+                new SqlParameter("@Usuario", usuario));
+        }
+
+        MostrarToast("Guardado Correctamente.", ToastTipo.Success);
+        AplicarModoEdicion(lblProyectoCotiza.Text, true);
+    }
+    catch (Exception ex)
+    {
+        SqlException sqlEx = ex as SqlException ?? ex.InnerException as SqlException;
+        string mensaje = (sqlEx != null && sqlEx.Number >= 50000)
+            ? sqlEx.Message
+            : "Error al actualizar legales.";
+        MostrarToast(mensaje, ToastTipo.Error);
+    }
+}
 ```
 
-El `catch` muestra los mensajes de negocio de los SP (por ejemplo 50004 si falta la transición `NUEVO → PAUSA`), igual que en `btnGuardarCambios_Click`.
+`dnp_spGuardaVersion` ya no aprueba en automático la versión 00 (se quitó la línea `(*)`), y el SP nuevo `dnp_spBriefPausarVersionPendiente` (sección 2b de `01_control_cambios_brief.sql`) aplica la pausa.
 
 ## Pendientes fuera de este paquete
 
